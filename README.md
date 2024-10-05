@@ -1,5 +1,5 @@
-# Financial Derivatives Strategy Backtester
-Backtesting system for various financial derivatives (e.g., stocks, options, bonds, ETFs, etc.)
+# Stock Market Strategy Backtester
+Backtesting system for various financial instruments (e.g., stocks, options, bonds, ETFs, etc.)
 
 ## Developed Using
 * __C++__
