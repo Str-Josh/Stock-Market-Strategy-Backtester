@@ -14,23 +14,23 @@ Backtesting system for various financial instruments (e.g., stocks, options, bon
 
 ### Installation
 1. Get a free API key at https://www.alphavantage.co/support/#api-key
-2. Clone the repo: `git clone https://github.com/Str-Josh/Financial-Derivatives-Strategy-Backtester.git`
+2. Clone the repo: <br> `git clone https://github.com/Str-Josh/Financial-Derivatives-Strategy-Backtester.git`
 3. Change git remote url to avoid accidental pushes to main project
-`git remote set-url origin github_username/repo_name`
-`git remote -v`
+<br>`git remote set-url origin github_username/repo_name`
+<br>`git remote -v`
 4. Install nlohmann/JSON and CURL
 5. Create a file called "keys.json" in the local project directory
 6. Enter the following in the keys.json file:
 `{
     "AlphaVantage": "YOUR-API-KEY-GOES-HERE"
 }`
-11. Compile the following scripts:
+11. Compile the following scripts:<br>
 `g++ main.cpp -c`
 `g++ Stock.cpp -c`
 `g++ Position.cpp -c`
 `g++ Portfolio.cpp -c`
 `g++ apiRequestBuilder.cpp -c`
-13. Create the executable script using the following (Assuming you're using G++):
+13. Create the executable script using the following (Assuming you're using G++):<br>
 `g++ main.o Stock.o Position.o Portfolio.o apiRequestBuilder.o -L"PATH-TO-LIBCURL-LIBRARY\lib" -lcurl -o BacktestingSystem`
 14. Go to project local directory and execute `BacktestingSystem.exe`
 
