@@ -29,7 +29,7 @@ class apiRequestBuilder {
         void establishQueryParams(std::map<std::string, std::string> queryParams);
         int send();
         std::string getApiKey(std::string webApiName, std::string jsonFileLocation = "keys.json");
-        void saveResponseToFile();
+        void saveResponseToFile(nlohmann::json jsonData);
 
         const nlohmann::json& getJsonResponseData();
         void setJsonResponseData(nlohmann::json jsonData);

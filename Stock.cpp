@@ -27,7 +27,10 @@ nlohmann::json Stock::getApiData(std::string apiFunctionType, unsigned int timeP
     return jsonObjectData;
 }
 
-Stock::Stock(const std::string tickerSymbol) { this->tickerSymbol = tickerSymbol; }
+Stock::Stock(const std::string tickerSymbol) {
+    this->tickerSymbol = tickerSymbol;
+    ///this->adjustedBenchmarkRate = (std::pow(1 + this->benchmarkRate, 1 / entries_per_year)) - 1;
+}
 
 std::string Stock::getTickerSymbol() { return this->tickerSymbol; }
 
@@ -37,12 +40,111 @@ std::string Stock::getStockExchange() { return this->stockExchange; }
 void Stock::setStockSector(std::string stockSector) { this->sector = stockSector; }
 std::string Stock::getStockSector() { return this->sector; }
 
-void Stock::calculateFundamentalData() {
-    /* Just the formulas for:
-    * Price to earnings ratio
-    * earnings per share
+void Stock::setBenchmarkStock(const Stock* stock) { this->benchmarkStock = stock; }
+const Stock* Stock::getBenchmarkStock() const { return this->benchmarkStock; }
+
+void Stock::calculatePerformanceMetrics() {
+    if (this->stockHistoricalDataDeque.size() == 0) { throw std::runtime_error("Need to retrieve historical data. Run getHistoricalData() first.\n"); }
+
+    double numberOfYearsPast = ((this->stockHistoricalDataDeque.size() - 1) - 0) / 365.25;
+    double entriesPerYear = this->stockHistoricalDataDeque.size() / numberOfYearsPast;
+    double mean = this->total_sum / this->stockHistoricalDataDeque.size();
+    this->adjustedBenchmarkRate = (std::pow(1 + this->benchmarkRate, 1 / entriesPerYear)) - 1;
+    double downsideSumOfSquares = 0.0;
+    
+    // Drawdown evaluators definitions.
+    std::function<double(double, double)> logDrawdownEvaluator = this->drawdownEvaluatorsMap.at("log");
+    std::function<double(double, double)> percentDrawdownEvaluator = this->drawdownEvaluatorsMap.at("percent");
+    
+    // Calculate R Squared (Temporary).
+    this->meanX = (((this->stockHistoricalDataDeque.size() - 1) * ((this->stockHistoricalDataDeque.size() + 1) + 1)) / 2) / (this->stockHistoricalDataDeque.size());
+    this->meanY = this->total_sum / this->stockHistoricalDataDeque.size();
+    this->meanX2 = (((this->stockHistoricalDataDeque.size() - 1) * (this->stockHistoricalDataDeque.size() - 1 + 1) * (2 * (this->stockHistoricalDataDeque.size() - 1) + 1)) / 6) / (this->stockHistoricalDataDeque.size());
+    this->meanY2 /= this->stockHistoricalDataDeque.size();
+    this->meanXY /= this->stockHistoricalDataDeque.size();
+    //double Sxx = this->meanX2 - (std::pow(this->meanX, 2));
+    //double Syy = this->meanY2 - (std::pow(this->meanY, 2));
+    //double Sxy = this->meanXY - (this->meanX * this->meanY);
+    //double beta0 = this->meanY - (this->meanX * (Sxy / Sxx));
+
+    // Calculate Jensen's Alpha.
+    if (this->benchmarkStock) {
+        if (!this->benchmarkStock->tickerSymbol.empty()) {
+            auto baseStockHistoricalDataDeque = this->stockHistoricalDataDeque;
+            auto benchmarkStockHistoricalDataDeque = this->benchmarkStock->stockHistoricalDataDeque;
+            if (benchmarkStockHistoricalDataDeque.size() != 0) {
+                int shortestStockLength = baseStockHistoricalDataDeque.size();
+                if (baseStockHistoricalDataDeque.size() > benchmarkStockHistoricalDataDeque.size()) {
+                    shortestStockLength = benchmarkStockHistoricalDataDeque.size();
+                }
+                else if (baseStockHistoricalDataDeque.size() < benchmarkStockHistoricalDataDeque.size()) {
+                    shortestStockLength = baseStockHistoricalDataDeque.size();
+                }
+
+                double sumReturns = 0.0;
+                double sumBenchmark = 0.0;
+                double sumReturnsSquared = 0.0;
+                double sumBenchmarkSquared = 0.0;
+                double sumReturnsBenchmark = 0.0;
+                for (size_t securityIndex = 0; securityIndex < shortestStockLength; securityIndex++) {
+                    sumReturns += baseStockHistoricalDataDeque.at(securityIndex).logReturns;
+                    sumBenchmark += benchmarkStockHistoricalDataDeque.at(securityIndex).logReturns;
+                    sumReturnsSquared += std::pow(baseStockHistoricalDataDeque.at(securityIndex).logReturns, 2);
+                    sumBenchmarkSquared += std::pow(benchmarkStockHistoricalDataDeque.at(securityIndex).logReturns, 2);
+                    sumReturnsBenchmark += baseStockHistoricalDataDeque.at(securityIndex).logReturns * benchmarkStockHistoricalDataDeque.at(securityIndex).logReturns;
+                }
+                // X= Benchmark; Y= Returns;
+                double meanBenchmark = sumBenchmark / shortestStockLength;
+                double meanReturns = sumReturns / shortestStockLength;
+                double meanBenchmarkSquared = sumBenchmarkSquared / shortestStockLength;
+                double meanReturnsSquared = sumReturnsSquared / shortestStockLength;
+                double meanReturnsBenchmark = sumReturnsBenchmark /shortestStockLength;
+                double Sxx = meanBenchmarkSquared - (std::pow(meanBenchmark, 2));
+                double Sxy = meanReturnsBenchmark - (meanBenchmarkSquared * meanReturns);
+                double beta0 = meanReturns - (meanBenchmarkSquared * (Sxy / Sxx));
+                // this->performanceMetrics.jensensAlpha = this->meanY - (this->meanX * ((this->meanXY - (this->meanX * this->meanY)) / ()));
+                this->performanceMetrics.jensensAlpha = meanReturns - (meanBenchmark * (Sxy / Sxx));
+            }
+        }
+    }
+
+    /*
+    std::cout << "Mean X:  " << this->meanX << "\n";
+    std::cout << "Mean Y:  " << this->meanY << "\n";
+    std::cout << "Mean XY:  " << this->meanXY << "\n";
+    std::cout << "Mean X2:  " << this->meanX2 << "\n";
+    std::cout << "Mean Y2:  " << this->meanY2 << "\n";
     */
-   std::cout << "calculate fundamental data" << "\n";
+
+    // Optimize later
+    double variance = 0.0;
+    double logMaximumDrawdownValue = 0.0;
+    for (auto historicalDataInstance : this->stockHistoricalDataDeque) {
+        variance += std::pow(historicalDataInstance.priceClose - mean, 2);
+        historicalDataInstance.downside = this->adjustedBenchmarkRate - historicalDataInstance.returns;
+        if (historicalDataInstance.downside > 0) {
+            downsideSumOfSquares += std::pow(historicalDataInstance.downside, 2);
+        }
+        historicalDataInstance.logDrawdown = logDrawdownEvaluator(historicalDataInstance.priceClose, historicalDataInstance.cumulativeMax);
+        logMaximumDrawdownValue = std::max(historicalDataInstance.logDrawdown, logMaximumDrawdownValue);
+    }
+    variance /= this->stockHistoricalDataDeque.size() - 1;
+    double standardDeviation = std::sqrt(variance);
+    double downsideDeviation = std::sqrt(downsideSumOfSquares / this->stockHistoricalDataDeque.size() - 1);
+    double valueFactoring = this->stockHistoricalDataDeque.at(this->stockHistoricalDataDeque.size() - 1).priceClose / this->stockHistoricalDataDeque.at(0).priceClose;
+    long double linreg_R2 = (std::pow(this->meanXY - (this->meanX * this->meanY), 2)) / ((meanX2 - std::pow(meanX, 2)) * (meanY2 - std::pow(meanY, 2)));
+    ///std::cout << "R Squared:  " << linreg_R2 << "\n";
+    
+    this->performanceMetrics.annualizedVolatility = standardDeviation * std::sqrt(static_cast<double>(entriesPerYear));
+    this->performanceMetrics.CAGR = (std::pow(valueFactoring, 1 / numberOfYearsPast)) - 1;
+    // High-Frequency Sharpe Ratio since assuming 0 for benchmark rate.
+    this->performanceMetrics.sharpeRatio = (this->performanceMetrics.CAGR - this->benchmarkRate) / this->performanceMetrics.annualizedVolatility;
+    this->performanceMetrics.annualizedDownsideDeviation = downsideDeviation * std::sqrt(entriesPerYear);
+    this->performanceMetrics.sortinoRatio = (this->performanceMetrics.CAGR - this->benchmarkRate) / downsideDeviation;
+    this->performanceMetrics.logMaximumDrawdown = logMaximumDrawdownValue;
+    this->performanceMetrics.logMaxDrawdownRatio = (std::log(this->stockHistoricalDataDeque.at(this->stockHistoricalDataDeque.size() - 1).priceClose  / this->stockHistoricalDataDeque.at(0).priceClose)) - this->performanceMetrics.logMaximumDrawdown;
+    this->performanceMetrics.calmarRatio = this->performanceMetrics.CAGR / this->performanceMetrics.percentMaximumDrawdown;
+    this->performanceMetrics.pureProfitScore = this->performanceMetrics.CAGR * linreg_R2;
 }
 
 void Stock::calculateTechnicalIndicators() {
@@ -126,11 +228,16 @@ void Stock::calculateTechnicalIndicators() {
 
             // A test JSON object... Will use the API call function for prod.
             // std::ifstream testApiCall("TechnicalIndicatorsData/testsData/Indicators-" + this->tickerSymbol + "-" + savedDataLoadKeyName + ".json");
-            json testJsonObject;
+            //json testJsonObject;
             // testApiCall >> testJsonObject;
 
             // Set our local variable to contain the data from the API call.
-            savedDataLoad[savedDataLoadKeyName] = testJsonObject;  // this->getApiData(functionType, timePeriodValue);
+            json testJsonObject;
+            // for production
+            ///savedDataLoad[savedDataLoadKeyName] = this->getApiData(functionType, timePeriodValue);
+
+            // for testing purposes (so we don't waste our API usage limit)
+            savedDataLoad[savedDataLoadKeyName] = testJsonObject;
 
             try {
                 // Save the API data to a JSON file.
@@ -310,7 +417,10 @@ void Stock::calculateTechnicalIndicators() {
 
 std::deque<Stock::historicalDataStruct> Stock::getHistoricalStockData(std::string filename) {
     std::deque<Stock::historicalDataStruct> dataVector;
+    // Old formatting
     std::ifstream dataFile(filename);
+    // New formatting
+    // std::ifstream dataFile(this->historicalStockDataFilename);
 
     if (!dataFile.is_open()) {
         throw std::runtime_error("Could not open file");
@@ -388,14 +498,50 @@ std::deque<Stock::historicalDataStruct> Stock::getHistoricalStockData(std::strin
         // Calculate Closing Location Value for the stock.
         double closingLocationValue = ((fileDataStructInstance.priceClose - fileDataStructInstance.low) - (fileDataStructInstance.high - fileDataStructInstance.priceClose)) / (fileDataStructInstance.high - fileDataStructInstance.low);
 
+        // Calculate Simple Sum Total.
+        this->total_sum += fileDataStructInstance.priceClose;
+
+        // Calculate sums for means for R Squared.
+        this->meanY2 += std::pow(fileDataStructInstance.priceClose, 2);
+        this->meanXY += dataVector.size() * fileDataStructInstance.priceClose;
+
+        // Cumulative Maximum.
+        if (fileDataStructInstance.priceClose >= this->maximumClosePrice) {
+            this->maximumClosePrice = fileDataStructInstance.priceClose;
+        }
+        fileDataStructInstance.cumulativeMax = this->maximumClosePrice;
+        
+        // Calculate Adjustd Benchmark Rate.
+        /*
+        double numberOfYearsPast = this->stockHistoricalDataDeque.size() / 365.25;
+        double entries_per_year;
+        if (numberOfYearsPast == 0) {
+            entries_per_year = 0;
+            this->adjustedBenchmarkRate = 0;
+        }
+        else {
+            entries_per_year = this->stockHistoricalDataDeque.size() / numberOfYearsPast;
+            this->adjustedBenchmarkRate = (std::pow(1 + this->benchmarkRate, 1 / entries_per_year)) - 1;
+        }
+        */
+        
+        // Calculate Downside.
+        /// fileDataStructInstance.downside = this->adjustedBenchmarkRate - fileDataStructInstance.returns;
+
         // Calculate Chaikin Money Flow for the stock.
         // CMF_i = ( SUM_(i-n)^i (CLV * volume) ) / ( SUM_(i-n)^i (volume) )
 
         // Calculate percent change for the stock price.
         if (dataVector.size() > 0) {
             struct Stock::historicalDataStruct previousDatum = dataVector.at(dataVector.size() - 1);
-            double percentChange = ( ( fileDataStructInstance.priceClose - previousDatum.priceClose ) / previousDatum.priceClose ) * 100;
-            fileDataStructInstance.percentChange = percentChange;
+            // double returns = ( ( fileDataStructInstance.priceClose - previousDatum.priceClose ) / previousDatum.priceClose );
+            // double percentReturn = ( ( fileDataStructInstance.priceClose - previousDatum.priceClose ) / previousDatum.priceClose ) * 100;
+            double returns = ( fileDataStructInstance.priceClose / previousDatum.priceClose ) - 1;
+            double percentReturns = returns * 100;
+            double logReturns = std::log(fileDataStructInstance.priceClose / previousDatum.priceClose);
+            fileDataStructInstance.returns = returns;
+            fileDataStructInstance.percentReturns = percentReturns;
+            fileDataStructInstance.logReturns = logReturns;
         }
         else { }
         dataVector.push_back(fileDataStructInstance);

@@ -26,7 +26,8 @@ void apiRequestBuilder::establishQueryParams(std::map<std::string, std::string> 
         }
     }
     this->queryParams.pop_back();
-    /*// For error checking...
+    /*
+    // For error checking...
     std::cout << "URL:  " << this->url << std::endl;
     std::cout << "Query:  " << this->queryParams << std::endl;
     std::cout << this->url + this->queryParams << std::endl;
@@ -68,11 +69,8 @@ int apiRequestBuilder::send() {
                         // std::cout << item.key() << std::endl;  // Testing
                         this->jsonResponseKeys.push(item.key());
                     }
-                    // std::cout << "Getting ready to set: \n";
                     std::unique_ptr<nlohmann::json> jsonDataObject = std::make_unique<nlohmann::json>(j);
-                    // std::cout << "created new unique_ptr: \n";
                     this->jsonResponse = std::move(jsonDataObject);
-                    // std::cout << "moved the json Data Object\n";
                 }
                 else {
                     std::cerr << "Error: JSON parsing failed" << "\n";
@@ -97,16 +95,14 @@ std::string apiRequestBuilder::getApiKey(std::string webApiName, std::string jso
     std::ifstream file(jsonFileLocation);
     nlohmann::json jsonObject;
     file >> jsonObject;
-    // std::string apiKey = jsonObject[webApiName];
     return jsonObject[webApiName];
 }
 
-void apiRequestBuilder::saveResponseToFile() {
+void apiRequestBuilder::saveResponseToFile(nlohmann::json jsonData) {
     std::lock_guard<std::mutex> lock(this->mtx);
     if (this->jsonResponse == NULL) {
         throw new std::logic_error("There is no response data available for access.");
     }
-    // TODO: Save the response in a JSON file..
 }
 
 const nlohmann::json& apiRequestBuilder::getJsonResponseData() { 
@@ -116,24 +112,13 @@ const nlohmann::json& apiRequestBuilder::getJsonResponseData() {
 
 void apiRequestBuilder::setJsonResponseData(nlohmann::json jsonData) {
     std::lock_guard<std::mutex> lock(this->mtx);
-    std::cout << "Getting to set: \n";
     std::unique_ptr<nlohmann::json> jsonDataObject = std::make_unique<nlohmann::json>(jsonData);
-    std::cout << "created new unique_ptr: \n";
     this->jsonResponse = std::move(jsonDataObject);
-    std::cout << "moved the json Data Object\n";
 }
 
-/*  To test this ind class
+/*  
+/// To test this class
 int main() {
-    //std::cout << "Starting:  \n";
-
-    // #include <chrono>
-    // auto start = std::chrono::high_resolution_clock::now();
-
-    // auto end = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    // std::cout << "Duration: " << duration.count() << " microseconds" << "\n";
-
     // Define our request url.
     std::string url = "https://www.alphavantage.co/query?";
     apiRequestBuilder request = apiRequestBuilder(url);
@@ -151,7 +136,7 @@ int main() {
     request.establishQueryParams(query);
     int success = request.send();
     std::cout << "\n\nProgram executed successfully";
-    std::cin.get();  //  Keeps the console window open so I can see what's up.
+    std::cin.get();
     return 1;
 }
 */

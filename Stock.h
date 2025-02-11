@@ -16,6 +16,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <map>
 #include <sstream> // std::stringstream
 #include <stdexcept> // std::runtime_error
@@ -36,13 +37,58 @@ class Stock {
         std::string stockExchange;
         std::string industry;
         std::string sector;
+        std::string historicalStockDataFilename;
 
         // Information for API request data call.
         std::string timeInterval = "daily";
 
-        struct fundamentalData {
-            double priceEarningsRatio;
-            double earningsPerShare;
+        // Information to be used in various calculations but might not be useful elsewhere.
+        double total_sum = 0.0;
+        double benchmarkRate = 0.0;
+        double adjustedBenchmarkRate;
+        double maximumClosePrice;
+
+        // R Squared Calculations.
+        long double meanX = 0.0;
+        long double meanY = 0.0;
+        long double meanXY = 0.0;
+        long double meanX2 = 0.0;
+        long double meanY2 = 0.0;
+
+        /// @brief Get Technical Indicator data from Alpha Vantage Web API.
+        /// @param apiFunctionType The technical indicator.
+        /// @param timePeriod Number of data points used to calculate each technical indicator value.
+        /// @param customQueryParameters Custom query parameters for custom API request.
+        /// @return JSON data received from the Web API.
+        nlohmann::json getApiData(std::string apiFunctionType, unsigned int timePeriod, std::map<std::string, std::string> customQueryParameters = {});
+
+    public:
+        // Drawdown evaluators for performance metrics.
+        /*
+        std::function<double(double, double)> dollarDrawdown = [](double price, double peak) { return peak - price; };
+        std::function<double(double, double)> percentDrawdown = [](double price, double peak) { return -((price / peak) - 1); };
+        std::function<double(double, double)> logDrawdown = [](double price, double peak) { return std::log(peak / price); };
+        std::map<std::string, std::function<double(double, double)>> drawdownEvaluators = { {"dollar", dollarDrawdown}, {"percent", percentDrawdown}, {"log", logDrawdown} };
+        */
+        std::map<std::string, std::function<double(double, double)>> drawdownEvaluatorsMap = {
+            {"dollar", [](double price, double peak) { return peak - price; }},
+            {"percent", [](double price, double peak) { return -((price / peak) - 1); }},
+            {"log", [](double price, double peak) { return std::log(peak / price); }}
+        };
+
+        struct performanceMetricsStruct {
+            double annualizedVolatility;
+            double sharpeRatio;
+            double CAGR;
+            double sortinoRatio;
+
+            double annualizedDownsideDeviation;
+            double logMaximumDrawdown;
+            double percentMaximumDrawdown;
+            double logMaxDrawdownRatio;
+            double calmarRatio;
+            double pureProfitScore;
+            double jensensAlpha;
         };
 
         struct technicalIndicators {
@@ -150,14 +196,15 @@ class Stock {
             double moneyFlowIndex;
         };
 
+        /*
         /// @brief Get Technical Indicator data from Alpha Vantage Web API.
         /// @param apiFunctionType The technical indicator.
         /// @param timePeriod Number of data points used to calculate each technical indicator value.
         /// @param customQueryParameters Custom query parameters for custom API request.
         /// @return JSON data received from the Web API.
         nlohmann::json getApiData(std::string apiFunctionType, unsigned int timePeriod, std::map<std::string, std::string> customQueryParameters = {});
+        */
 
-    public:
         struct historicalDataStruct {
             std::string date;
             double priceOpen;
@@ -167,20 +214,32 @@ class Stock {
             double adjustedClosePrice;
             int volume;
             // Below are calculated data.
-            double percentChange;
+            double returns;
+            double percentReturns;
+            double logReturns;
+            double downside;
+            double logDrawdown;
+            double percentDrawdown;
+            double cumulativeMax;
+
+            // Other things
             double averagePrice;
             double medianPrice;
             double typicalPrice;
             double moneyFlow;
         };
 
+        performanceMetricsStruct performanceMetrics;
         std::deque<historicalDataStruct> stockHistoricalDataDeque;
         std::map<std::string, technicalIndicators> stockTechnicalIndicatorsMap;
+
+        // Stock();
 
         /// @brief Constructor for the Stock class.
         /// @param tickerSymbol The universal symbol to represent a given financial instrument.
         Stock(const std::string tickerSymbol);
-
+        
+        const Stock* benchmarkStock = nullptr;
 
         // Getters & Setters
 
@@ -192,10 +251,13 @@ class Stock {
         void setStockSector(std::string stockSector);
         std::string getStockSector();
 
+        void setBenchmarkStock(const Stock* stock);
+        const Stock* getBenchmarkStock() const;
+
 
         // Analysis metrics calculation methods.
 
-        void calculateFundamentalData();
+        void calculatePerformanceMetrics();
         
         /// @brief Create or load JSON data for technical indicators.
         void calculateTechnicalIndicators();
