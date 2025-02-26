@@ -18,7 +18,7 @@ Backtesting system for various financial instruments (e.g., stocks, options, bon
 3. Change git remote url to avoid accidental pushes to main project
 <br>`git remote set-url origin github_username/repo_name`
 <br>`git remote -v`
-4. Install nlohmann/json: [a link](https://github.com/nlohmann/json) and CURL: [a link](https://curl.se/windows/)
+4. Install [nlohmann/json](https://github.com/nlohmann/json) and [CURL](https://curl.se/windows/)
 5. Create a file called "keys.json" in the local project directory
 6. Enter the following in the keys.json file:
 `{
