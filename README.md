@@ -25,15 +25,19 @@ Backtesting system for various financial instruments (e.g., stocks, options, bon
     "AlphaVantage": "YOUR-API-KEY-GOES-HERE"
 }`
 11. Compile the following scripts:<br>
-`g++ main.cpp -c`
-`g++ Stock.cpp -c`
-`g++ Strategies.cpp -c`
-`g++ Position.cpp -c`
-`g++ Portfolio.cpp -c`
-`g++ Option.cpp -c`
-`g++ apiRequestBuilder.cpp -c`
-13. Create the executable script using the following (Assuming you're using G++):<br>
+`g++ -c main.cpp`
+`g++ -c Stock.cpp`
+`g++ -c Strategies.cpp`
+`g++ -c Position.cpp`
+`g++ -c Portfolio.cpp`
+`g++ -c Option.cpp`
+`g++ -c apiRequestBuilder.cpp`
+13. If you're using Windows, link the object files using the following (Assuming you're using G++):<br>
 `g++ main.o Stock.o Strategies.o Position.o Portfolio.o Option.o apiRequestBuilder.o -L"PATH-TO-LIBCURL-LIBRARY\lib" -lcurl -o BacktestingSystem`
+13. If you're using Linux, ensure that you have linux-native libcurl version installed using:<br>
+`sudo apt install libcurl4-openssl-dev libnghttp2-dev`
+    Then link the object files using the following:<br>
+    `g++ main.o Stock.o Strategies.o Position.o Portfolio.o Option.o apiRequestBuilder.o -lcurl -lnghttp2 -o BacktestingSystem`
 14. Go to project local directory and execute `BacktestingSystem.exe`
 
 
